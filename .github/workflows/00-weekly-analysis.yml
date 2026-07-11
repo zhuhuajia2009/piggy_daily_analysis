@@ -399,6 +399,8 @@ jobs:
           REALTIME_SOURCE_PRIORITY: ${{ vars.REALTIME_SOURCE_PRIORITY || 'tencent,akshare_sina,efinance,akshare_em' }}
           
         run: |
+          echo "DEBUG: FULL_POOL_LIST is: '${{ vars.FULL_POOL_LIST }}'"
+          echo "DEBUG: STOCK_LIST_CONFIG is: '${STOCK_LIST_CONFIG:-}'"
           # 解析自选股配置：
           # 1. Repository/Environment secrets 或 Repository variables（STOCK_LIST_CONFIG）
           # 2. 同名 Environment variables 注入的 runner 环境变量（STOCK_LIST）
