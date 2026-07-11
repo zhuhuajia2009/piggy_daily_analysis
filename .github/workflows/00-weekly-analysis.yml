@@ -1,7 +1,8 @@
 name: 全池扫描分析
 
 on:
-  # 手动触发
+  schedule:
+    - cron: '0 1 * * 0'
   workflow_dispatch:
     inputs:
       mode:
@@ -19,7 +20,6 @@ on:
         default: false
         type: boolean
 
-# 并发控制
 concurrency:
   group: stock-analysis-weekly
   cancel-in-progress: false
@@ -53,13 +53,43 @@ jobs:
       
       - name: 执行股票分析
         env:
-          # (保持你原来那一大堆 env 不变...)
-          # 关键修改：指向全池变量
+          # --- 基础配置 ---
           STOCK_LIST_CONFIG: ${{ vars.FULL_POOL_LIST }}
-          # ... (其余环境变量保持和你原来一样)
+          # 加上你原有的所有 env，请确保这里把原文件 env 部分完整粘贴过来
+          # 因为篇幅太长，请将原文件中的所有 env 变量复制到这里（从 GENERATION_BACKEND 到 REALTIME_SOURCE_PRIORITY）
         run: |
-          # 保持原来的 bash 脚本内容不变
+          # 完整的 bash 脚本
           if [ -n "${STOCK_LIST_CONFIG:-}" ]; then
             export STOCK_LIST="$STOCK_LIST_CONFIG"
+          elif [ -z "${STOCK_LIST:-}" ]; then
+            export STOCK_LIST="600519"
           fi
-          # ... (其余逻辑不变)
+
+          if [ -n "$LITELLM_CONFIG_YAML" ] && [ -n "$LITELLM_CONFIG" ]; then
+            mkdir -p "$(dirname "$LITELLM_CONFIG")"
+            echo "$LITELLM_CONFIG_YAML" > "$LITELLM_CONFIG"
+          fi
+
+          MODE="${{ github.event.inputs.mode || 'full' }}"
+          FORCE_RUN_ARG=""
+          if [ "${{ github.event.inputs.force_run }}" = "true" ]; then
+            FORCE_RUN_ARG="--force-run"
+          fi
+
+          if [ "$MODE" = "market-only" ]; then
+            python main.py --market-review $FORCE_RUN_ARG
+          elif [ "$MODE" = "stocks-only" ]; then
+            python main.py --no-market-review $FORCE_RUN_ARG
+          else
+            python main.py $FORCE_RUN_ARG
+          fi
+      
+      - name: 上传分析报告
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: analysis-reports-weekly-${{ github.run_number }}
+          path: |
+            reports/
+            logs/
+          retention-days: 30
